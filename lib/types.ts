@@ -44,3 +44,20 @@ export interface ChatMessage {
 export interface ApiResponse {
   sections: Record<string, string>
 }
+
+export interface Section {
+  title: string
+  content: string
+}
+
+export interface AssistantResponse {
+  mode: Mode
+  sections: Section[]
+}
+
+export interface Message {
+  id: string
+  role: 'user' | 'assistant'
+  content: string | AssistantResponse
+  timestamp: Date
+}
