@@ -36,11 +36,18 @@ export const MODE_CONFIGS: Record<Mode, ModeConfig> = {
   }
 }
 
+export interface Attachment {
+  name: string
+  mimeType: string
+  dataUrl: string // full data url for preview or just base64 slice
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
   mode: Mode
+  attachments?: Attachment[]
   sections?: Record<string, string>
   timestamp: Date
 }

@@ -9,7 +9,6 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'Logixly - AI-Powered Developer Assistant',
   description: 'A mode-based reasoning assistant that provides structured approaches for web development, SQL, and problem solving',
-  generator: 'v0.app',
   icons: {
     icon: [
       {

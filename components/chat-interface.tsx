@@ -5,7 +5,7 @@ import { ModeSelector } from '@/components/mode-selector'
 import { ChatInput } from '@/components/chat-input'
 import { ChatOutput } from '@/components/chat-output'
 import { Sidebar } from '@/components/sidebar'
-import type { Mode, ChatMessage, ApiResponse, Conversation } from '@/lib/types'
+import type { Mode, ChatMessage, ApiResponse, Conversation, Attachment } from '@/lib/types'
 
 export function ChatInterface() {
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -74,14 +74,15 @@ export function ChatInterface() {
     }
   }
 
-  const handleSend = useCallback(async (input: string) => {
-    if (!input.trim() || loading) return
+  const handleSend = useCallback(async (input: string, attachments?: Attachment[]) => {
+    if ((!input.trim() && (!attachments || attachments.length === 0)) || loading) return
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
       content: input,
       mode: selectedMode,
+      attachments,
       timestamp: new Date(),
     }
 
@@ -94,7 +95,7 @@ export function ChatInterface() {
         currentConversationId = crypto.randomUUID()
         const newConv: Conversation = {
           id: currentConversationId,
-          title: input.slice(0, 30) + (input.length > 30 ? '...' : ''),
+          title: input ? (input.slice(0, 30) + (input.length > 30 ? '...' : '')) : (attachments?.[0]?.name || 'Attached File'),
           mode: selectedMode,
           messages: [userMessage],
           createdAt: now,
@@ -123,7 +124,7 @@ export function ChatInterface() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: selectedMode, input }),
+        body: JSON.stringify({ mode: selectedMode, input, attachments }),
       })
 
       if (!response.ok) {

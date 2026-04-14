@@ -71,10 +71,10 @@ export async function POST(request: NextRequest) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const body = await request.json()
-    const { mode, input } = body as { mode: Mode, input: string }
+    const { mode, input, attachments } = body as { mode: Mode, input: string, attachments?: { name: string, mimeType: string, dataUrl: string }[] }
     
-    if (!mode || !input) {
-      return NextResponse.json({ error: 'Mode and input are required' }, { status: 400 })
+    if (!mode || (!input && (!attachments || attachments.length === 0))) {
+      return NextResponse.json({ error: 'Mode and input/attachments are required' }, { status: 400 })
     }
     
     if (!MODE_SECTIONS[mode]) {
@@ -98,7 +98,23 @@ export async function POST(request: NextRequest) {
         ]
     });
 
-    let result = await chatSession.sendMessage(input);
+    let payloadParts: any[] = [{ text: input || '' }];
+    
+    if (attachments && attachments.length > 0) {
+       for (const file of attachments) {
+         const base64Data = file.dataUrl.split(',')[1];
+         if (base64Data) {
+            payloadParts.push({
+               inlineData: {
+                  data: base64Data,
+                  mimeType: file.mimeType
+               }
+            });
+         }
+       }
+    }
+
+    let result = await chatSession.sendMessage(payloadParts);
     let text = result.response.text();
 
     console.log("Raw Gemini Output:\n", text);
