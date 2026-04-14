@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface ResponseCardProps {
   title: string
@@ -28,8 +30,8 @@ export function ResponseCard({ title, content, index }: ResponseCardProps) {
       )}
       style={{ animationDelay: `${index * 100}ms` }}
     >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-primary uppercase tracking-wide">
+      <div className="flex items-center justify-between mb-3 border-b border-border/50 pb-2">
+        <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">
           {title}
         </h3>
         <Button
@@ -45,10 +47,10 @@ export function ResponseCard({ title, content, index }: ResponseCardProps) {
           )}
         </Button>
       </div>
-      <div className="prose prose-invert prose-sm max-w-none">
-        <p className="text-foreground/90 leading-relaxed whitespace-pre-wrap">
+      <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-secondary prose-pre:border prose-pre:border-border">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
           {content}
-        </p>
+        </ReactMarkdown>
       </div>
     </div>
   )

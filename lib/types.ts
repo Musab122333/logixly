@@ -6,6 +6,7 @@ export interface ModeConfig {
   icon: string
   placeholder: string
   sections: string[]
+  color: string // Tailwind color class or specific hex
 }
 
 export const MODE_CONFIGS: Record<Mode, ModeConfig> = {
@@ -14,21 +15,24 @@ export const MODE_CONFIGS: Record<Mode, ModeConfig> = {
     label: 'Web Dev',
     icon: 'code',
     placeholder: 'Enter your tech stack + problem...',
-    sections: ['Problem Understanding', 'Root Cause', 'Fix Strategy', 'Best Practices']
+    sections: ['Problem Understanding', 'Root Cause', 'Fix Strategy', 'Best Practices'],
+    color: 'from-blue-500 to-cyan-400'
   },
   sql: {
     id: 'sql',
     label: 'SQL',
     icon: 'database',
     placeholder: 'Describe your database problem...',
-    sections: ['Tables', 'Joins', 'Filters', 'Aggregations', 'Optimization']
+    sections: ['Tables', 'Joins', 'Filters', 'Aggregations', 'Optimization'],
+    color: 'from-violet-500 to-purple-400'
   },
   'problem-solving': {
     id: 'problem-solving',
     label: 'Problem Solving',
     icon: 'brain',
     placeholder: 'Paste your coding problem...',
-    sections: ['Brute Force', 'Better Approach', 'Optimal Approach']
+    sections: ['Brute Force', 'Better Approach', 'Optimal Approach'],
+    color: 'from-amber-500 to-orange-400'
   }
 }
 
@@ -41,23 +45,15 @@ export interface ChatMessage {
   timestamp: Date
 }
 
+export interface Conversation {
+  id: string
+  title: string
+  mode: Mode
+  messages: ChatMessage[]
+  updatedAt: Date
+  createdAt: Date
+}
+
 export interface ApiResponse {
   sections: Record<string, string>
-}
-
-export interface Section {
-  title: string
-  content: string
-}
-
-export interface AssistantResponse {
-  mode: Mode
-  sections: Section[]
-}
-
-export interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string | AssistantResponse
-  timestamp: Date
 }

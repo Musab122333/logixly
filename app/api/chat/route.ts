@@ -1,161 +1,121 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import { SYSTEM_PROMPTS, GUARDRAIL_REPROMPT, containsCode } from '@/lib/prompts'
+import type { Mode } from '@/lib/types'
 
-export type Mode = 'webdev' | 'sql' | 'problem-solving'
-
-interface ChatRequest {
-  mode: Mode
-  input: string
-}
-
-interface ChatResponse {
-  sections: Record<string, string>
-}
-
-// Mode-specific section configurations
+// Mode-specific expected sections, roughly reflecting prompts
 const MODE_SECTIONS: Record<Mode, string[]> = {
   webdev: ['Problem Understanding', 'Root Cause', 'Fix Strategy', 'Best Practices'],
   sql: ['Tables', 'Joins', 'Filters', 'Aggregations', 'Optimization'],
   'problem-solving': ['Brute Force', 'Better Approach', 'Optimal Approach']
 }
 
-// Generate structured response based on mode
-function generateResponse(mode: Mode, input: string): Record<string, string> {
-  const sections = MODE_SECTIONS[mode]
-  const result: Record<string, string> = {}
-  
-  // This is a placeholder - in production, you would integrate with an AI service
-  // The responses demonstrate the structured format
-  
-  switch (mode) {
-    case 'webdev':
-      result['Problem Understanding'] = `Analyzing your web development issue: "${input.slice(0, 100)}${input.length > 100 ? '...' : ''}"
+function parseGeminiResponse(text: string, mode: Mode): Record<string, string> {
+  const sections = MODE_SECTIONS[mode];
+  const parsedSections: Record<string, string> = {};
 
-This appears to involve frontend/backend coordination challenges. Let me break down the key aspects of this problem.`
-      
-      result['Root Cause'] = `The underlying cause is likely related to:
-• State management complexity
-• Asynchronous data flow issues
-• Component lifecycle mismanagement
-• API integration challenges`
-      
-      result['Fix Strategy'] = `Recommended approach:
-1. Audit current implementation for anti-patterns
-2. Implement proper error boundaries
-3. Add comprehensive logging
-4. Refactor with separation of concerns
-5. Add proper TypeScript types`
-      
-      result['Best Practices'] = `Follow these guidelines:
-• Use React hooks properly (dependency arrays)
-• Implement loading and error states
-• Add proper TypeScript annotations
-• Follow the principle of least privilege
-• Implement proper testing coverage`
-      break
-      
-    case 'sql':
-      result['Tables'] = `Based on your query, identify these table structures:
-• Primary entity table (main data source)
-• Lookup/reference tables for foreign keys
-• Junction tables for many-to-many relationships`
-      
-      result['Joins'] = `Consider these join strategies:
-• INNER JOIN: When you need matching records only
-• LEFT JOIN: Preserve all records from primary table
-• RIGHT JOIN: Preserve all records from secondary table
-• CROSS JOIN: Only for cartesian products (use sparingly)`
-      
-      result['Filters'] = `Apply filters strategically:
-• Use WHERE before GROUP BY for row-level filtering
-• Use HAVING after GROUP BY for aggregate filtering
-• Apply indexed columns in WHERE clauses first
-• Consider NULL handling with COALESCE or IFNULL`
-      
-      result['Aggregations'] = `Aggregation best practices:
-• COUNT(*) vs COUNT(column) - know the difference
-• Use SUM with CASE for conditional aggregation
-• Consider window functions for running totals
-• GROUP BY all non-aggregated columns`
-      
-      result['Optimization'] = `Performance optimization tips:
-• Add indexes on frequently queried columns
-• Avoid SELECT * in production queries
-• Use EXPLAIN ANALYZE to profile queries
-• Consider query caching strategies
-• Partition large tables appropriately`
-      break
-      
-    case 'problem-solving':
-      result['Brute Force'] = `Brute Force Approach:
-The naive solution would iterate through all possible combinations.
+  let currentSection = "";
+  let currentContent = "";
 
-Time Complexity: O(n²) or O(n³)
-Space Complexity: O(1) to O(n)
+  const lines = text.split('\n');
 
-This works for small inputs (n < 1000) but times out on larger datasets.`
-      
-      result['Better Approach'] = `Optimized Approach:
-Use a hash map or set to store intermediate results.
+  for (const line of lines) {
+    // Check if line matches a known section heading
+    const candidateMatches = sections.filter(s => line.toLowerCase().includes(s.toLowerCase() + ':'));
+    
+    // Also check for bold markdown around the heading just in case
+    const candidateMatchesBold = sections.filter(s => line.toLowerCase().includes('**' + s.toLowerCase() + '**'));
 
-Time Complexity: O(n)
-Space Complexity: O(n)
-
-Trade memory for speed - this is usually acceptable in practice.
-
-Key insight: Pre-compute and store results to avoid redundant calculations.`
-      
-      result['Optimal Approach'] = `Optimal Solution:
-Apply two-pointer technique or sliding window pattern.
-
-Time Complexity: O(n)
-Space Complexity: O(1)
-
-This achieves the best of both worlds when applicable.
-
-Implementation notes:
-1. Sort the input if order doesn't matter
-2. Use two pointers from opposite ends
-3. Move pointers based on comparison result`
-      break
+    if (candidateMatches.length > 0) {
+      if (currentSection) {
+        parsedSections[currentSection] = currentContent.trim();
+      }
+      currentSection = candidateMatches[0];
+      currentContent = line.replace(new RegExp(`.*${currentSection}:?`, 'i'), '').trim() + '\n';
+    } else if (candidateMatchesBold.length > 0) {
+      if (currentSection) {
+         parsedSections[currentSection] = currentContent.trim();
+      }
+      currentSection = candidateMatchesBold[0];
+      currentContent = line.replace(new RegExp(`.*\\*\\*${currentSection}\\*\\*:?`, 'i'), '').trim() + '\n';
+    } else {
+       currentContent += line + '\n';
+    }
   }
-  
-  return result
+
+  if (currentSection) {
+    parsedSections[currentSection] = currentContent.trim();
+  }
+
+  // Fallback if parsing fails - just put everything in the first section
+  if (Object.keys(parsedSections).length === 0) {
+    parsedSections[sections[0]] = text;
+  } else {
+     // Ensure all expected sections are minimally present
+     for (const expected of sections) {
+        if (!parsedSections[expected]) {
+           parsedSections[expected] = "No specific guidance provided for this section.";
+        }
+     }
+  }
+
+  return parsedSections;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body: ChatRequest = await request.json()
-    const { mode, input } = body
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        return NextResponse.json({ error: 'Gemini API Key is missing' }, { status: 500 });
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const body = await request.json()
+    const { mode, input } = body as { mode: Mode, input: string }
     
-    // Validate request
     if (!mode || !input) {
-      return NextResponse.json(
-        { error: 'Mode and input are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Mode and input are required' }, { status: 400 })
     }
     
     if (!MODE_SECTIONS[mode]) {
-      return NextResponse.json(
-        { error: 'Invalid mode' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid mode' }, { status: 400 })
+    }
+
+    // Initialize the model
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    // Ensure we start a chat session to pass system prompt effectively (as history)
+    const chatSession = model.startChat({
+        history: [
+            {
+               role: 'user',
+               parts: [{ text: SYSTEM_PROMPTS[mode] }]
+            },
+            {
+               role: 'model',
+               parts: [{ text: "I understand the instructions and rules. I will provide structured reasoning following the exact sections required, and I will absolutely NOT include any code or syntax highlighted blocks." }]
+            }
+        ]
+    });
+
+    let result = await chatSession.sendMessage(input);
+    let text = result.response.text();
+
+    console.log("Raw Gemini Output:\n", text);
+
+    const hasCode = containsCode(text);
+    if (hasCode) {
+         console.warn("User logic guardrail triggered! Gemini returned code. Re-prompting...");
+         const retryResult = await chatSession.sendMessage(GUARDRAIL_REPROMPT);
+         text = retryResult.response.text();
+         console.log("Retried Gemini Output:\n", text);
     }
     
-    // Simulate API processing delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    const parsedSections = parseGeminiResponse(text, mode);
     
-    // Generate structured response
-    const sections = generateResponse(mode, input)
-    
-    const response: ChatResponse = { sections }
-    
-    return NextResponse.json(response)
+    return NextResponse.json({ sections: parsedSections })
   } catch (error) {
     console.error('Chat API error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
