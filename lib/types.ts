@@ -15,7 +15,7 @@ export const MODE_CONFIGS: Record<Mode, ModeConfig> = {
     label: 'Web Dev',
     icon: 'code',
     placeholder: 'Enter your tech stack + problem...',
-    sections: ['Problem Understanding', 'Root Cause', 'Fix Strategy', 'Best Practices'],
+    sections: ['Problem Understanding', 'Root Cause', 'Fix Strategy', 'Pseudo-Code', 'Best Practices'],
     color: 'from-blue-500 to-cyan-400'
   },
   sql: {
@@ -31,7 +31,7 @@ export const MODE_CONFIGS: Record<Mode, ModeConfig> = {
     label: 'Problem Solving',
     icon: 'brain',
     placeholder: 'Paste your coding problem...',
-    sections: ['Brute Force', 'Better Approach', 'Optimal Approach'],
+    sections: ['Brute Force', 'Better Approach', 'Optimal Approach', 'Pseudo-Code'],
     color: 'from-amber-500 to-orange-400'
   }
 }

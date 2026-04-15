@@ -5,9 +5,9 @@ import type { Mode } from '@/lib/types'
 
 // Mode-specific expected sections, roughly reflecting prompts
 const MODE_SECTIONS: Record<Mode, string[]> = {
-  webdev: ['Problem Understanding', 'Root Cause', 'Fix Strategy', 'Best Practices'],
+  webdev: ['Problem Understanding', 'Root Cause', 'Fix Strategy', 'Pseudo-Code', 'Best Practices'],
   sql: ['Tables', 'Joins', 'Filters', 'Aggregations', 'Optimization'],
-  'problem-solving': ['Brute Force', 'Better Approach', 'Optimal Approach']
+  'problem-solving': ['Brute Force', 'Better Approach', 'Optimal Approach', 'Pseudo-Code']
 }
 
 function parseGeminiResponse(text: string, mode: Mode): Record<string, string> {
@@ -104,12 +104,22 @@ export async function POST(request: NextRequest) {
        for (const file of attachments) {
          const base64Data = file.dataUrl.split(',')[1];
          if (base64Data) {
-            payloadParts.push({
-               inlineData: {
-                  data: base64Data,
-                  mimeType: file.mimeType
-               }
-            });
+            if (file.mimeType.startsWith('image/') || file.mimeType === 'application/pdf') {
+                payloadParts.push({
+                   inlineData: {
+                      data: base64Data,
+                      mimeType: file.mimeType
+                   }
+                });
+            } else {
+                // Decode text files instead of sending as inlineData
+                try {
+                   const decodedText = Buffer.from(base64Data, 'base64').toString('utf-8');
+                   payloadParts.push({ text: `\n\n--- Attached File: ${file.name} ---\n${decodedText}\n--- End of File ---\n` });
+                } catch(e) {
+                   console.error("Failed to decode attachment", e);
+                }
+            }
          }
        }
     }
